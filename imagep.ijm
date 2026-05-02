@@ -3,7 +3,7 @@
 // Applied to computationally intensive artistic endeavors  
 // Designed to work with any images
 //
-// 5.1.2026
+// 5.2.2026 - Added in Github - https://github.com/brunocardot/ImageProcessing
 //  
 
 // https://imagej.net/ij/developer/macro/functions.html
@@ -76,7 +76,8 @@ var sExecEnd=0;
 macro "ipp_tool [f9]" { 
     
 // BEGIN MACRO ===============================================================  
-  print ("Start ImageP Macro...");
+
+  print ("Start ImageP Macro...");
 
   fct_Menu(); // Exit when press Cancel
   

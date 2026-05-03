@@ -24,8 +24,9 @@ var gS,gZ,gA;                                 	// Square, Z, Angle
 var gAdjustement;                             	// Adjustement to keep copy/paste overlap so no hole is seen 
 var gWidth, gHeight;                          	// Source File Information  
 var gSourceID, gDestinationID;                	// ID for Source(Input) and Destination(Output) Files  
-var gDestinationDir="c:\\Temp.Images";	   			// Default Location 
+var gDestinationDir="c:\\TempXXImages";	   				// Default Location 
 var gSourceFileName;                          	// Source file name  
+var gSourceFilePath;                          	// Source file full path
 var gDirpath;                                 	// Dir selection full path  
 var gDirlist;                                 	// Dir selection file list  
 var gSC=0;                                    	// Slice Count (for debugging)  
@@ -101,6 +102,8 @@ var gHideSep2=false;  // Hide separator after Drawing/Features section
 var gHideSep3=false;  // Hide separator after Output section
 var gHideSep4=false;  // Hide separator after Options section
 
+var gReportFile="";   // Path to the HTML report file
+
 // Execution Time of Macro
 var sExecTimeTotal="0";
 var sExecBegin=0; 
@@ -119,9 +122,12 @@ macro "ipp_tool [f9]" {
   
 	while (1) {
 		sExecBegin = getTime();
+		fct_ReportInit(); // create/open HTML report before processing
 		fct_ExecFeatures ();
 		sExecEnd = getTime();
 		sExecTimeTotal = ExecDuration (sExecBegin, sExecEnd,0);
+		// Open the HTML report in the default browser
+		if (gReportFile != "") exec("cmd", "/c", "start", "", gReportFile);
 		//
 		fct_Menu();
 	}
@@ -880,7 +886,12 @@ function fct_Menu() { // Dialog Menu()
 	Dialog.setInsets(0,10,0);
 	Dialog.addMessage("ImageJ: " + ijv + "\nMem: " + IJ.freeMemory() + "\nTime: " + sExecTimeTotal);
 		
-	// Show Dialog  		
+	// --- Quit ---
+	Dialog.setInsets(0,10,0);
+	Dialog.addMessage(vLine);
+	Dialog.addCheckbox("Quit Fiji", false);
+
+	// Show Dialog
 	Dialog.show();
 
   // Read the Selections 
@@ -915,7 +926,8 @@ function fct_Menu() { // Dialog Menu()
   if (!gLock_sRM)  { sRM  = Dialog.getChoice();   print ("sRM="+sRM); }
   if (!gLock_sRR)  { sRR  = Dialog.getCheckbox(); print ("sRR="+sRR); }
   if (!gLock_sLP)  { sLP  = Dialog.getCheckbox(); print ("sLP="+sLP); }
-	// +Duration Line
+  sQuit = Dialog.getCheckbox();
+  if (sQuit) { print("Quit Fiji requested."); run("Quit"); }
 	
 }  
  
@@ -945,11 +957,111 @@ function fct_FormatSaveImage(ot, id, cl, fct, dir, fn) { // Format and Save the 
     run("Select None");  
   }  
   
-  if (sSD) {  
-    saveAs("Tiff", ffn);  
-    print ("SaveAs of " + ffn);  
-    if (cl) run("Close");  
-  }  
+  thumbFile = "";
+  srcThumbFile = "";
+  savedTiffFile = "";
+  if (sSD) {
+    savedTiffFile = ffn + ".tif";
+    saveAs("Tiff", ffn);
+    print ("SaveAs TIFF: " + savedTiffFile);
+    selectImage(id);
+
+    thumbDir = dir + File.separator + "thumbs";
+    if (File.isDirectory(thumbDir) != 1) File.makeDirectory(thumbDir);
+    dt = fct_DT();
+
+    // Save output thumbnail (small, for display in report)
+    thumbFile = thumbDir + File.separator + "ij." + fct + "-" + sRM + "." + fn + "." + dt + ".jpg";
+    selectImage(id);
+    run("Duplicate...", "title=thumb_out_hl");
+    // Draw yellow slice highlight on result thumbnail
+    if (fct == "s04") {
+      // 4-slice: first slice is the top-left quadrant
+      getDimensions(tw, th, tc, ts, tf);
+      setColor(255, 255, 0);
+      lw = maxOf(3, floor(tw / 200));
+      setLineWidth(lw);
+      drawRect(0, 0, floor(tw / 2), floor(th / 2));
+    } else if (fct > 4) {
+      // n-slice triangle: apex at center, base at right edge
+      getDimensions(tw, th, tc, ts, tf);
+      tA     = 360.0 / fct;
+      tAlpha = tA / 2.0 * PI / 180.0;
+      tCx    = tw / 2.0;
+      tCy    = th / 2.0;
+      tRad   = tCx;
+      tHalf  = tRad * tan(tAlpha);
+      tx_apex = floor(tCx);
+      ty_apex = floor(tCy);
+      tx_top  = tw - 1;
+      ty_top  = floor(tCy - tHalf);
+      tx_bot  = tw - 1;
+      ty_bot  = floor(tCy + tHalf);
+      setColor(255, 255, 0);
+      lw = maxOf(3, floor(tw / 200));
+      setLineWidth(lw);
+      drawLine(tx_apex, ty_apex, tx_top, ty_top);
+      drawLine(tx_top,  ty_top,  tx_bot, ty_bot);
+      drawLine(tx_bot,  ty_bot,  tx_apex, ty_apex);
+    }
+    run("Select None");
+    getDimensions(tw, th, tc, ts, tf);
+    scale = 300 / maxOf(tw, th);
+    if (scale > 1) scale = 1;
+    run("Scale...", "x=" + scale + " y=" + scale + " interpolation=Bilinear average create title=thumb_out_final");
+    saveAs("Jpeg", thumbFile);
+    close(); // thumb_out_final
+    close(); // thumb_out_hl
+    selectImage(id);
+
+    // Save source thumbnail with highlighted slice triangle
+    if (isOpen(gSourceID)) {
+      srcThumbFile = thumbDir + File.separator + "src." + fn + "." + dt + ".jpg";
+      selectImage(gSourceID);
+      run("Select None");
+      run("Duplicate...", "title=thumb_src_hl");
+      // Draw yellow slice highlight on source thumbnail
+      if (fct == "s04") {
+        // 4-slice: source selection is the top-left gS x gS square
+        getDimensions(sw, sh, sc, ss, sf);
+        tSQ = minOf(sw, sh);
+        setColor(255, 255, 0);
+        lw = maxOf(3, floor(sw / 200));
+        setLineWidth(lw);
+        drawRect(0, 0, tSQ, tSQ);
+      } else if (fct > 4) {
+        // n-slice triangle: left point at center-left, right base at right edge
+        getDimensions(sw, sh, sc, ss, sf);
+        tA     = 360.0 / fct;
+        tAlpha = tA / 2.0 * PI / 180.0;
+        tS = sw;
+        tZ = tS * tan(tAlpha);
+        if (tZ > sh / 2.0) { tZ = sh / 2.0; tS = tZ / tan(tAlpha); }
+        tL  = sh / 2.0;
+        tx1 = floor(tS); ty1 = floor(tL - tZ);
+        tx2 = floor(tS); ty2 = floor(tL + tZ);
+        tx3 = 0;         ty3 = floor(tL);
+        setColor(255, 255, 0);
+        lw = maxOf(3, floor(sw / 200));
+        setLineWidth(lw);
+        drawLine(tx3, ty3, tx1, ty1);
+        drawLine(tx1, ty1, tx2, ty2);
+        drawLine(tx2, ty2, tx3, ty3);
+      }
+      run("Select None");
+      getDimensions(sw, sh, sc, ss, sf);
+      sscale = 300 / maxOf(sw, sh);
+      if (sscale > 1) sscale = 1;
+      run("Scale...", "x=" + sscale + " y=" + sscale + " interpolation=Bilinear average create title=thumb_src_final");
+      saveAs("Jpeg", srcThumbFile);
+      close(); // thumb_src_final
+      close(); // thumb_src_hl
+      selectImage(id);
+    }
+
+    if (cl) run("Close");
+  }
+  fct_ReportAddEntry(srcThumbFile, thumbFile, savedTiffFile, fct);
 }  
   
 function fct_DrawTheSelection (pSlices, pID) { // Draw the select based on the Slices # 
@@ -1222,9 +1334,9 @@ function fct_PrintSelectionImageInfo(x1,x2,x3,x4,x5,y1,y2,y3,y4,y5,xx,yy,ww,hh,W
 function fct_Read_image_info() { // Read information from the current active file   
  
   // gDestinationDir=getInfo("image.directory") + gTargetSubdir;  
-  gSourceFileName = getInfo("image.filename");  
-  gSourceID = getImageID();  
-   
+  gSourceFileName  = getInfo("image.filename");  
+  gSourceFilePath  = getInfo("image.directory") + gSourceFileName;  
+  gSourceID        = getImageID();
   getDimensions(width, height, channels, slices, frames);  
   gWidth = width;  
   gHeight = height;  
@@ -1300,6 +1412,9 @@ function fct_LoadConfig() { // Load settings from imagep.cfg
 
     key   = replace(substring(line, 0, eqIdx),   " ", "");
     value = replace(substring(line, eqIdx + 1), " ", "");
+    // Strip inline comment (anything after first #)
+    hashIdx = indexOf(value, "#");
+    if (hashIdx >= 0) value = substring(value, 0, hashIdx);
 
     if      (key == "s04")             { s04             = (value == "true"); gLock_s04   = true; }
     else if (key == "sRP")             { sRP             = parseFloat(value);  gLock_sRP   = true; }
@@ -1335,4 +1450,100 @@ function fct_LoadConfig() { // Load settings from imagep.cfg
   print("Config loaded.");
 }
   
-// END MACRO ===================================================================  
+// END MACRO ===================================================================
+
+// =============================================================================
+// HTML Report Functions
+// =============================================================================
+
+function fct_ReportInit() { // Create/open the HTML report file for this run
+
+  if (File.isDirectory(gDestinationDir) != 1) File.makeDirectory(gDestinationDir);
+  gReportFile = gDestinationDir + File.separator + "report-" + fct_DT() + ".html";
+  print("Report file: " + gReportFile);
+
+  // Write header only if file does not exist yet
+  if (!File.exists(gReportFile)) {
+    h  = "<!DOCTYPE html>\n";
+    h = h + "<html><head><meta charset='utf-8'>\n";
+    h = h + "<title>Image Pattern Processor - Report</title>\n";
+    h = h + "<style>\n";
+    h = h + "  body { font-family: Arial, sans-serif; background:#1a1a1a; color:#ddd; margin:20px; }\n";
+    h = h + "  h1   { color:#fff; }\n";
+    h = h + "  .run { border:1px solid #444; border-radius:6px; padding:12px; margin-bottom:20px; background:#2a2a2a; }\n";
+    h = h + "  .run h2 { margin:0 0 10px 0; color:#adf; font-size:1em; }\n";
+    h = h + "  table { border-collapse:collapse; font-size:0.85em; margin-bottom:10px; }\n";
+    h = h + "  td,th { border:1px solid #555; padding:4px 10px; }\n";
+    h = h + "  th    { background:#333; color:#ccc; }\n";
+    h = h + "  img   { max-width:300px; max-height:300px; border:1px solid #555; border-radius:4px; }\n";
+    h = h + "  .thumb  { text-align:center; font-size:0.75em; color:#aaa; }\n";
+    h = h + "</style>\n";
+    h = h + "</head><body>\n";
+    h = h + "<h1>Image Pattern Processor - Run Report</h1>\n";
+    File.saveString(h, gReportFile);
+    print("Report created: " + gReportFile);
+  } else {
+    print("Report already exists, appending.");
+  }
+}
+
+function fct_ThumbTag(f, href, caption) { // Build a linked HTML img tag for the report
+  if (f == "") return "";
+  // img src: relative path (browser loads thumbs from same folder as report)
+  thumbName = File.getName(f);
+  // href: absolute file:/// URL to original file, spaces encoded
+  h = replace(href, "\\\\", "/");
+  h = replace(h, "\\", "/");
+  h = replace(h, " ", "%20");
+  return "<div class='thumb'><a href='file:///" + h + "' target='_blank'><img src='thumbs/" + thumbName + "'></a><br>" + caption + "</div>\n";
+}
+
+function fct_ReportAddEntry(srcFile, savedFile, fullFile, label) { // Append one result entry to the HTML report
+
+  if (gReportFile == "") { print("Report: gReportFile not set, skipping."); return; }
+
+  // Normalize label to human-readable name
+  labelStr = "" + label;
+  if      (labelStr == "s04")    labelStr = "4 Slices";
+  else if (labelStr == "s08"  || labelStr == "8")   labelStr = "8 Slices";
+  else if (labelStr == "s09"  || labelStr == "9")   labelStr = "9 Slices";
+  else if (labelStr == "16")  labelStr = "16 Slices";
+  else if (labelStr == "32")  labelStr = "32 Slices";
+  else if (labelStr == "64")  labelStr = "64 Slices";
+  else if (labelStr == "128") labelStr = "128 Slices";
+  else if (labelStr == "sST")    labelStr = "Seamless Tile";
+  else if (labelStr == "sDR")    labelStr = "Drawing";
+  else if (labelStr == "sMa")    labelStr = "Maze";
+  else if (labelStr == "sIGP")   labelStr = "Islamic Geom.";
+  else if (labelStr == "Source") labelStr = "Source";
+  // Build settings table rows
+  rows = "<tr><th>Setting</th><th>Value</th></tr>\n";
+  rows = rows + "<tr><td>Date/Time</td><td>"    + fct_DT()        + "</td></tr>\n";
+  rows = rows + "<tr><td>Label</td><td>"         + labelStr        + "</td></tr>\n";
+  rows = rows + "<tr><td>Source file</td><td>"   + gSourceFileName + "</td></tr>\n";
+  rows = rows + "<tr><td>4 Slices</td><td>"      + s04             + "</td></tr>\n";
+  rows = rows + "<tr><td>8 Slices</td><td>"      + s08             + "</td></tr>\n";
+  rows = rows + "<tr><td>16 Slices</td><td>"     + s16             + "</td></tr>\n";
+  rows = rows + "<tr><td>32 Slices</td><td>"     + s32             + "</td></tr>\n";
+  rows = rows + "<tr><td>64 Slices</td><td>"     + s64             + "</td></tr>\n";
+  rows = rows + "<tr><td>128 Slices</td><td>"    + s128            + "</td></tr>\n";
+  rows = rows + "<tr><td>Repeat</td><td>"        + sRP             + "</td></tr>\n";
+  rows = rows + "<tr><td>Drawing</td><td>"       + sDR + " (" + sDN + ")</td></tr>\n";
+  rows = rows + "<tr><td>Maze</td><td>"          + sMa             + "</td></tr>\n";
+  rows = rows + "<tr><td>Seamless Tile</td><td>" + sST             + "</td></tr>\n";
+  rows = rows + "<tr><td>Islamic Geom.</td><td>" + sIGP            + "</td></tr>\n";
+  rows = rows + "<tr><td>Interpolation</td><td>" + sRM             + "</td></tr>\n";
+  rows = rows + "<tr><td>Exec Time</td><td>"     + sExecTimeTotal  + "</td></tr>\n";
+
+  entry = "<div class='run'>\n";
+  entry = entry + "  <h2>" + fct_DT() + " - " + labelStr + "</h2>\n";
+  entry = entry + "  <div style='display:flex;gap:20px;align-items:flex-start;'>\n";
+  entry = entry + "    <table>" + rows + "</table>\n";
+  entry = entry + fct_ThumbTag(srcFile,   gSourceFilePath, "Source");
+  entry = entry + fct_ThumbTag(savedFile, fullFile,        "Result");
+  entry = entry + "  </div>\n";
+  entry = entry + "</div>\n";
+
+  File.append(entry, gReportFile);
+  print("Report updated: " + gReportFile);
+}

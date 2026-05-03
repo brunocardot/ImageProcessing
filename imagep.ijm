@@ -3,7 +3,11 @@
 // Applied to computationally intensive artistic endeavors  
 // Designed to work with any images
 //
-// 5.2.2026 - Added in Github - https://github.com/brunocardot/ImageProcessing
+// 5.2.2026
+// 		Added in Github - https://github.com/brunocardot/ImageProcessing
+// 		Start IP:      .\Fiji\fiji.bat --run imagep.ijm
+//    Fiji Update:   (NOT WORKING) .\Fiji\fiji.bat --run "Help>Update Fiji"
+//		Kill Fiji:     pskill fiji-windows-x64.exe
 //  
 
 // https://imagej.net/ij/developer/macro/functions.html
@@ -49,7 +53,7 @@ var s32=false;    // Slices 32
 var s64=false;    // Slices 64  
 var s128=false;   // Slices 128  
 var sDR=false;    // Drawing  
-var sDN=false;    // Drawing Number A/B/C/D/E...  
+var sDN="A";      // Drawing Number A/B/C/D/E...  
 var sMa=false;    // Build a Maze  
 var sST=false;    // Build a Seamless Tile  
 var sIGP=false;   // Build a Islamic Geometric Pattern
@@ -62,9 +66,40 @@ var sRO=false;    // Rotate Image before to add selection
 var sDB1=false;   // Debug 1 - Drawline with different color around the selection  
 var sSM=false;    // Silent Mode  
 var sSR=false;    // Square Rendue
-var sRM=0;        // Rotate Method
+var sRM="Bilinear"; // Rotate Method
 var sRR=false;    // Reduce Resolution  
 var sLP=false;    // Low Speed  
+
+// Config Lock Flags (true = set from config file, hidden from dialog)
+var gLock_s04=false;
+var gLock_sRP=false;
+var gLock_s08=false;
+var gLock_s16=false;
+var gLock_s32=false;
+var gLock_s64=false;
+var gLock_s128=false;
+var gLock_sDR=false;
+var gLock_sDN=false;
+var gLock_sMa=false;
+var gLock_sST=false;
+var gLock_sIGP=false;
+var gLock_sIGPsq=false;
+var gLock_sDi=false;
+var gLock_sSS=false;
+var gLock_sSD=false;
+var gLock_sCS=false;
+var gLock_sRO=false;
+var gLock_sDB1=false;
+var gLock_sSM=false;
+var gLock_sSR=false;
+var gLock_sRM=false;
+var gLock_sRR=false;
+var gLock_sLP=false;
+
+var gHideSep1=false;  // Hide separator after Mandala section
+var gHideSep2=false;  // Hide separator after Drawing/Features section
+var gHideSep3=false;  // Hide separator after Output section
+var gHideSep4=false;  // Hide separator after Options section
 
 // Execution Time of Macro
 var sExecTimeTotal="0";
@@ -79,6 +114,7 @@ macro "ipp_tool [f9]" {
 
   print ("Start ImageP Macro...");
 
+  fct_LoadConfig(); // Load configuration from imagep.cfg
   fct_Menu(); // Exit when press Cancel
   
 	while (1) {
@@ -787,104 +823,98 @@ function fct_Menu() { // Dialog Menu()
 	// Dialog.create(title);  
 	Dialog.createNonBlocking(title);  
 	//
-	var vLine = "-------------------------------------------------------------------------------";
-	Dialog.setInsets   (0,10,0);
-	Dialog.addMessage  ("Mandala:");
-	Dialog.setInsets   (0,20,0);    
-	Dialog.addCheckbox ("  4 Slices", false);  
-	// Dialog.addSlider ("  Repeat", 1, 10, 1);  
-	Dialog.addToSameRow();
-	Dialog.addNumber   ("  Repeat", 1);  
-	Dialog.addCheckbox ("  8 Slices", false);  
-	Dialog.addCheckbox ("16 Slices", false);  
-	Dialog.addCheckbox ("32 Slices", false);
-  Dialog.addCheckbox ("64 Slices", false);
-  Dialog.addCheckbox ("128 Slices", false);
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  (vLine);  
-	Dialog.addCheckbox ("Drawing", false);  
-	Dialog.addToSameRow();
-	Dialog.addChoice   ("Drawing#", newArray("A","B"));  
-	Dialog.addCheckbox ("Maze", false);  
-	Dialog.addCheckbox ("Seamless Tile", false);   
-	Dialog.addCheckbox ("Islamic Geometric Pattern", false);  
-	Dialog.addToSameRow();
-	Dialog.addCheckbox ("Add Square around Tile", false);  
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  (vLine);  
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  ("Input:");  
-	Dialog.addCheckbox ("Directory Source", false);  
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  ("Output:");  
-	Dialog.addCheckbox ("Save Source", false);  
-	Dialog.addCheckbox ("Save Destination", false);  
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  (vLine);  
-  Dialog.setInsets   (0,10,0);   
-	Dialog.addMessage  ("Options:");  
-	Dialog.addCheckbox ("Change Selection", false);  
-	Dialog.addCheckbox ("PreRotateFirst", false)  
-	Dialog.addCheckbox ("Show Slices/Debug", false);  
-	Dialog.addCheckbox ("Run Silent Mode", false);  
-	Dialog.addCheckbox ("Square Rendue", false);  
-	Dialog.addChoice   ("      Interpolation:", newArray("Bilinear", "Bicubic", "None"));  // Interpolation Method
-	Dialog.addCheckbox ("Reduced Resolution (before processing)", false);  
-	Dialog.addCheckbox ("Low Speed Mode", false);  
-	
-	//
-	// Info Section
-	//
-	Dialog.setInsets   (0,10,0); 
-	Dialog.addMessage  (vLine);  
-  Dialog.setInsets   (0,10,0); 
-	Dialog.addMessage  ("ImageJ Version = " + ijv);
-	
-	Dialog.setInsets   (0,10,0); 
-	// var mem = toString ( floor (parseInt(IJ.currentMemory()) / parseInt(IJ.maxMemory()) * 100) ); // mem usage (%)
-	// Dialog.addMessage  ("Mem = " + IJ.currentMemory())
-	Dialog.addMessage  ("Mem = " + IJ.freeMemory());
-	// Dialog.addMessage  ("Mem = " + IJ.maxMemory());
-	// Dialog.addMessage  ("Mem = " + mem + "\%");
-	
-	Dialog.setInsets   (0,10,0); 
-	Dialog.addMessage  ("Execution Time = " + sExecTimeTotal);
-	
+	var vLine = "  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -";
+
+	// --- Mandala ---
+	var gAllMandalaLocked = gLock_s04 && gLock_sRP && gLock_s08 && gLock_s16 && gLock_s32 && gLock_s64 && gLock_s128;
+	if (!gAllMandalaLocked) { Dialog.setInsets(0,10,0); Dialog.addMessage("MANDALA"); }
+	Dialog.setInsets(0,20,0);
+	if (!gLock_s04)  Dialog.addCheckbox("  4 Slices", s04);
+	// Dialog.addSlider("  Repeat", 1, 10, 1);
+	if (!gLock_s04 && !gLock_sRP) Dialog.addToSameRow();
+	if (!gLock_sRP)  Dialog.addNumber("  Repeat", sRP);
+	if (!gLock_s08)  Dialog.addCheckbox("  8 Slices", s08);
+	if (!gLock_s16)  Dialog.addCheckbox("16 Slices", s16);
+	if (!gLock_s32)  Dialog.addCheckbox("32 Slices", s32);
+	if (!gLock_s64)  Dialog.addCheckbox("64 Slices", s64);
+	if (!gLock_s128) Dialog.addCheckbox("128 Slices", s128);
+	if (!gHideSep1) { Dialog.setInsets(0,10,0); Dialog.addMessage(vLine); }
+	// --- Drawing & Features ---
+	var gAllDrawingLocked = gLock_sDR && gLock_sDN && gLock_sMa && gLock_sST && gLock_sIGP && gLock_sIGPsq;
+	if (!gAllDrawingLocked) { Dialog.setInsets(0,10,0); Dialog.addMessage("DRAWING & FEATURES"); }
+	Dialog.setInsets(0,20,0);
+	if (!gLock_sDR) Dialog.addCheckbox("Drawing", sDR);
+	if (!gLock_sDR && !gLock_sDN) Dialog.addToSameRow();
+	if (!gLock_sDN) Dialog.addChoice("Drawing#", newArray("A","B"), sDN);
+	if (!gLock_sMa)    Dialog.addCheckbox("Maze", sMa);
+	if (!gLock_sST)    Dialog.addCheckbox("Seamless Tile", sST);
+	if (!gLock_sIGP)   Dialog.addCheckbox("Islamic Geometric Pattern", sIGP);
+	if (!gLock_sIGP && !gLock_sIGPsq) Dialog.addToSameRow();
+	if (!gLock_sIGPsq) Dialog.addCheckbox("Add Square around Tile", sIGPsq);
+	if (!gHideSep2) { Dialog.setInsets(0,10,0); Dialog.addMessage(vLine); }
+
+	// --- Input / Output ---
+	var gAllIOLocked = gLock_sDi && gLock_sSS && gLock_sSD;
+	if (!gAllIOLocked) { Dialog.setInsets(0,10,0); Dialog.addMessage("INPUT / OUTPUT"); }
+	Dialog.setInsets(0,20,0);
+	if (!gLock_sDi) Dialog.addCheckbox("Directory Source", sDi);
+	if (!gLock_sSS) Dialog.addCheckbox("Save Source", sSS);
+	if (!gLock_sSD) Dialog.addCheckbox("Save Destination", sSD);
+	if (!gHideSep3) { Dialog.setInsets(0,10,0); Dialog.addMessage(vLine); }
+
+	// --- Options ---
+	var gAllOptionsLocked = gLock_sCS && gLock_sRO && gLock_sDB1 && gLock_sSM && gLock_sSR && gLock_sRM && gLock_sRR && gLock_sLP;
+	if (!gAllOptionsLocked) { Dialog.setInsets(0,10,0); Dialog.addMessage("OPTIONS"); }
+	Dialog.setInsets(0,20,0);
+	if (!gLock_sCS)  Dialog.addCheckbox("Change Selection", sCS);
+	if (!gLock_sRO)  Dialog.addCheckbox("PreRotateFirst", sRO);
+	if (!gLock_sDB1) Dialog.addCheckbox("Show Slices/Debug", sDB1);
+	if (!gLock_sSM)  Dialog.addCheckbox("Run Silent Mode", sSM);
+	if (!gLock_sSR)  Dialog.addCheckbox("Square Rendue", sSR);
+	if (!gLock_sRM)  Dialog.addChoice("Interpolation:", newArray("Bilinear", "Bicubic", "None"), sRM);
+	if (!gLock_sRR)  Dialog.addCheckbox("Reduced Resolution (before processing)", sRR);
+	if (!gLock_sLP)  Dialog.addCheckbox("Low Speed Mode", sLP);
+
+	// --- Info ---
+	if (!gHideSep4) { Dialog.setInsets(0,10,0); Dialog.addMessage(vLine); }
+	Dialog.setInsets(0,10,0);
+	Dialog.addMessage("ImageJ: " + ijv + "\nMem: " + IJ.freeMemory() + "\nTime: " + sExecTimeTotal);
+		
 	// Show Dialog  		
 	Dialog.show();
 
   // Read the Selections 
   // *** it needs to be in the same order *** 
    
-  s04 = Dialog.getCheckbox();    print ("s04="+s04);  
-  sRP = Dialog.getNumber();      print ("sRP="+sRP);  
-  s08 = Dialog.getCheckbox();    print ("s08="+s08);  
-  s16 = Dialog.getCheckbox();    print ("s16="+s16);  
-  s32 = Dialog.getCheckbox();    print ("s32="+s32);  
-  s64 = Dialog.getCheckbox();    print ("s64="+s64);  
-  s128 = Dialog.getCheckbox();   print ("s128="+s128);  
-    
-  sDR = Dialog.getCheckbox();    print ("sDR="+sDR);  
-  sDN = Dialog.getChoice();      print ("sDN="+sDN);  
-    
-  sMa = Dialog.getCheckbox();    print ("sMa="+sMa);  
-  sST = Dialog.getCheckbox();    print ("sST="+sST);  
-  sIGP = Dialog.getCheckbox();   print ("sIGP="+sIGP);  
-  sIGPsq = Dialog.getCheckbox(); print ("sIGPsq="+sIGPsq);  
-   
-  sDi = Dialog.getCheckbox();    print ("sDi="+sDi); // Directory  
-    
-  sSS = Dialog.getCheckbox();    print ("sSS="+sSS);  
-  sSD = Dialog.getCheckbox();    print ("sSD="+sSD);  
-    
-  sCS = Dialog.getCheckbox();    print ("sCS="+sCS); // Change Selection  
-  sRO = Dialog.getCheckbox();    print ("sRO="+sRO); // Rotate Image before to add selection  
-  sDB1 = Dialog.getCheckbox();   print ("sDB1="+sDB1);   
-  sSM = Dialog.getCheckbox();    print ("sSM="+sSM); // Silent Mode  
-  sSR = Dialog.getCheckbox();    print ("sSR="+sSR); // Square Mode 
-  sRM = Dialog.getChoice();      print ("sRM="+sRM); // Rotate Method - Interpolation Mode
-  sRR = Dialog.getCheckbox();    print ("sRR="+sRR); // Reduce Scale  
-	sLP = Dialog.getCheckbox();    print ("sLP="+sLP); // Low Speed  
+  if (!gLock_s04)  { s04    = Dialog.getCheckbox(); print ("s04="+s04); }
+  if (!gLock_sRP)  { sRP    = Dialog.getNumber();   print ("sRP="+sRP); }
+  if (!gLock_s08)  { s08    = Dialog.getCheckbox(); print ("s08="+s08); }
+  if (!gLock_s16)  { s16    = Dialog.getCheckbox(); print ("s16="+s16); }
+  if (!gLock_s32)  { s32    = Dialog.getCheckbox(); print ("s32="+s32); }
+  if (!gLock_s64)  { s64    = Dialog.getCheckbox(); print ("s64="+s64); }
+  if (!gLock_s128) { s128   = Dialog.getCheckbox(); print ("s128="+s128); }
+
+  if (!gLock_sDR)    { sDR    = Dialog.getCheckbox(); print ("sDR="+sDR); }
+  if (!gLock_sDN)    { sDN    = Dialog.getChoice();   print ("sDN="+sDN); }
+
+  if (!gLock_sMa)    { sMa    = Dialog.getCheckbox(); print ("sMa="+sMa); }
+  if (!gLock_sST)    { sST    = Dialog.getCheckbox(); print ("sST="+sST); }
+  if (!gLock_sIGP)   { sIGP   = Dialog.getCheckbox(); print ("sIGP="+sIGP); }
+  if (!gLock_sIGPsq) { sIGPsq = Dialog.getCheckbox(); print ("sIGPsq="+sIGPsq); }
+
+  if (!gLock_sDi) { sDi = Dialog.getCheckbox(); print ("sDi="+sDi); }
+
+  if (!gLock_sSS) { sSS = Dialog.getCheckbox(); print ("sSS="+sSS); }
+  if (!gLock_sSD) { sSD = Dialog.getCheckbox(); print ("sSD="+sSD); }
+
+  if (!gLock_sCS)  { sCS  = Dialog.getCheckbox(); print ("sCS="+sCS); }
+  if (!gLock_sRO)  { sRO  = Dialog.getCheckbox(); print ("sRO="+sRO); }
+  if (!gLock_sDB1) { sDB1 = Dialog.getCheckbox(); print ("sDB1="+sDB1); }
+  if (!gLock_sSM)  { sSM  = Dialog.getCheckbox(); print ("sSM="+sSM); }
+  if (!gLock_sSR)  { sSR  = Dialog.getCheckbox(); print ("sSR="+sSR); }
+  if (!gLock_sRM)  { sRM  = Dialog.getChoice();   print ("sRM="+sRM); }
+  if (!gLock_sRR)  { sRR  = Dialog.getCheckbox(); print ("sRR="+sRR); }
+  if (!gLock_sLP)  { sLP  = Dialog.getCheckbox(); print ("sLP="+sLP); }
 	// +Duration Line
 	
 }  
@@ -1232,5 +1262,77 @@ function fct_Reduce_Resolution() { // Reduce Resolution (Speed up Process)
 function fct_Mem() { // Report Memory Status 
   print ("IJ.maxMemory()="+IJ.maxMemory()+" IJ.currentMemory()="+IJ.currentMemory()+" IJ.freeMemory()="+IJ.freeMemory());  
 }  
+
+function fct_LoadConfig() { // Load settings from imagep.cfg
+
+  // Resolve config file path: working directory first, then macro file directory
+  cfgFile = "";
+  // Try 1: Java working directory (where fiji.bat was launched from)
+  userDir = getInfo("user.dir");
+  if (userDir != "") cfgFile = userDir + File.separator + "imagep.cfg";
+  // Try 2: same directory as macro.filepath (fallback)
+  if (!File.exists(cfgFile)) {
+    macroPath = getInfo("macro.filepath");
+    if (macroPath != "") {
+      sep = "\\";
+      idx = lastIndexOf(macroPath, sep);
+      if (idx < 0) { sep = "/"; idx = lastIndexOf(macroPath, sep); }
+      if (idx >= 0) cfgFile = substring(macroPath, 0, idx + 1) + "imagep.cfg";
+    }
+  }
+  print("Loading config from: " + cfgFile);
+
+  if (!File.exists(cfgFile)) {
+    print("Config file not found: " + cfgFile + " (using defaults)");
+    return;
+  }
+
+  print("Loading config: " + cfgFile);
+  content = File.openAsString(cfgFile);
+  lines = split(content, "\n");
+
+  for (i = 0; i < lines.length; i++) {
+    line = replace(lines[i], "\r", ""); // strip CR (Windows line endings)
+    if (startsWith(line, "#") || lengthOf(line) == 0) continue; // skip comments
+
+    eqIdx = indexOf(line, "=");
+    if (eqIdx < 0) continue;
+
+    key   = replace(substring(line, 0, eqIdx),   " ", "");
+    value = replace(substring(line, eqIdx + 1), " ", "");
+
+    if      (key == "s04")             { s04             = (value == "true"); gLock_s04   = true; }
+    else if (key == "sRP")             { sRP             = parseFloat(value);  gLock_sRP   = true; }
+    else if (key == "s08")             { s08             = (value == "true"); gLock_s08   = true; }
+    else if (key == "s16")             { s16             = (value == "true"); gLock_s16   = true; }
+    else if (key == "s32")             { s32             = (value == "true"); gLock_s32   = true; }
+    else if (key == "s64")             { s64             = (value == "true"); gLock_s64   = true; }
+    else if (key == "s128")            { s128            = (value == "true"); gLock_s128  = true; }
+    else if (key == "sDR")             { sDR             = (value == "true"); gLock_sDR   = true; }
+    else if (key == "sDN")             { sDN             = value;             gLock_sDN   = true; }
+    else if (key == "sMa")             { sMa             = (value == "true"); gLock_sMa   = true; }
+    else if (key == "sST")             { sST             = (value == "true"); gLock_sST   = true; }
+    else if (key == "sIGP")            { sIGP            = (value == "true"); gLock_sIGP  = true; }
+    else if (key == "sIGPsq")          { sIGPsq          = (value == "true"); gLock_sIGPsq= true; }
+    else if (key == "sDi")             { sDi             = (value == "true"); gLock_sDi   = true; }
+    else if (key == "sSS")             { sSS             = (value == "true"); gLock_sSS   = true; }
+    else if (key == "sSD")             { sSD             = (value == "true"); gLock_sSD   = true; }
+    else if (key == "sCS")             { sCS             = (value == "true"); gLock_sCS   = true; }
+    else if (key == "sRO")             { sRO             = (value == "true"); gLock_sRO   = true; }
+    else if (key == "sDB1")            { sDB1            = (value == "true"); gLock_sDB1  = true; }
+    else if (key == "sSM")             { sSM             = (value == "true"); gLock_sSM   = true; }
+    else if (key == "sSR")             { sSR             = (value == "true"); gLock_sSR   = true; }
+    else if (key == "sRM")             { sRM             = value;             gLock_sRM   = true; }
+    else if (key == "sRR")             { sRR             = (value == "true"); gLock_sRR   = true; }
+    else if (key == "sLP")             { sLP             = (value == "true"); gLock_sLP   = true; }
+    else if (key == "sSep1")           { gHideSep1       = (value == "false"); }
+    else if (key == "sSep2")           { gHideSep2       = (value == "false"); }
+    else if (key == "sSep3")           { gHideSep3       = (value == "false"); }
+    else if (key == "sSep4")           { gHideSep4       = (value == "false"); }
+    else if (key == "gDestinationDir") gDestinationDir = value;
+    else print("Config: unknown key ignored: " + key);
+  }
+  print("Config loaded.");
+}
   
 // END MACRO ===================================================================  

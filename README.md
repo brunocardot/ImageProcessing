@@ -44,4 +44,12 @@ Processes an entire folder of images automatically, applying the selected featur
 
 ## Usage
 
-Press **F9** inside ImageJ/Fiji to launch the macro. A menu will appear to configure the desired features, then the macro runs in a loop until cancelled.
+### From Command Line
+Open a terminal in `.\ImageProcessing` and run:
+
+```bat
+.\Fiji\fiji.bat --run imagep.ijm
+```
+
+### From Inside ImageJ/Fiji
+Press **F9** to launch the macro. A menu will appear to configure the desired features, then the macro runs in a loop until cancelled.
